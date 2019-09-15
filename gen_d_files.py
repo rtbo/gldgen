@@ -1,5 +1,16 @@
 #! /usr/bin/env python3
 
+def readExtsFile(path):
+    exts = []
+    with open(path, 'r') as f:
+        for l in f.readlines():
+            ext = l.strip()
+            if ext.startswith('#'):
+                continue
+            if len(ext):
+                exts.append(ext)
+    return exts
+
 if __name__ == "__main__":
 
     import sys
@@ -21,6 +32,14 @@ if __name__ == "__main__":
                         help='D package of generated modules [gld]')
     parser.add_argument('--dest', dest='dest', default=path.join(rootDir, 'd'),
                         help='Destination folder for generated files [(gldgen)/d]')
+    parser.add_argument('--gl-def-exts', dest='glDefExts', 
+                        help='Set of default extensions to include in the generation')
+    parser.add_argument('--gl-addext-file', dest='glAddExtFile', 
+                        help="Path to file containing extensions to add (one by line)")
+    parser.add_argument('--gl-remext', dest='glRemExts', nargs="*", default=[],
+                        help="Extensions to remove (defaults to None)")
+    parser.add_argument('--gl-remext-file', dest='glRemExtFile', 
+                        help="Path to file containing extensions to remove (one by line)")
     args = parser.parse_args()
 
     pack = args.package
@@ -41,6 +60,13 @@ if __name__ == "__main__":
                 ofile.write(t.substitute(pack=pack))
             files.append(ofname)
 
+    glRemExts = args.glRemExts
+    if args.glRemExtFile:
+        glRemExts += readExtsFile(args.glRemExtFile)
+
+    glAddExts = []
+    if args.glAddExtFile:
+        glAddExts += readExtsFile(args.glAddExtFile) 
 
     # Turn a list of strings into a regexp string matching exactly those strings
     def makeREstring(list):
@@ -56,6 +82,13 @@ if __name__ == "__main__":
     glCoreARBPat      = None
     glx13andLaterPat  = "1\.[3-9]"
 
+    glAddExtsPat = None
+    if len(glAddExts):
+        glAddExtsPat = makeREstring(glAddExts)
+
+    glRemExtsPat = None
+    if len(glRemExts):
+        glRemExtsPat = makeREstring(glRemExts)
 
     buildList = [
         DGeneratorOptions(      # equivalent of glcorearb.h
@@ -64,9 +97,9 @@ if __name__ == "__main__":
             profile             = "core",
             versions            = allVersions,
             emitversions        = allVersions,
-            defaultExtensions   = "glcore",
-            addExtensions       = glCoreARBPat,
-            removeExtensions    = None,
+            defaultExtensions   = args.glDefExts,
+            addExtensions       = glAddExtsPat,
+            removeExtensions    = glRemExtsPat,
             regFile             = path.join(regDir, "gl.xml"),
             module              = "{}.gl".format(pack),
             humanName           = "OpenGL",
